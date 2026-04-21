@@ -35,6 +35,15 @@
 
 set -eu
 
+# ─── Locate python interpreter ───────────────────────────────────────────────
+# Prefer `python3`; fall back to `python` for environments like git-bash on
+# Windows Server where Python 3.14 ships as `python` only.
+PY=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || true)
+if [ -z "$PY" ]; then
+  echo "BLOCK: compliance-gate.sh requires python3 or python on PATH." >&2
+  exit 2
+fi
+
 # ─── Read config with defaults ───────────────────────────────────────────────
 EVIDENCE="${COMPLIANCE_EVIDENCE_PATH:-/tmp/compliance-gate-evidence.json}"
 MAX_AGE="${COMPLIANCE_MAX_AGE_SECONDS:-3600}"
@@ -45,7 +54,7 @@ MAX_HIGH="${COMPLIANCE_MAX_HIGH:-0}"
 
 # ─── Parse hook payload → command string ─────────────────────────────────────
 INPUT=$(cat)
-COMMAND=$(python3 -c 'import json, sys
+COMMAND=$("$PY" -c 'import json, sys
 try:
     d = json.loads(sys.stdin.read())
     print(d.get("tool_input", {}).get("command", ""))
@@ -55,7 +64,7 @@ except Exception:
 # ─── Short-circuit: only fire on actual `git push` ───────────────────────────
 # Tokenize to avoid matching substrings in string literals (e.g. sqlite
 # statements or grep patterns containing "git push").
-IS_PUSH=$(python3 -c 'import shlex, sys
+IS_PUSH=$("$PY" -c 'import shlex, sys
 cmd = sys.argv[1]
 try:
     tokens = shlex.split(cmd, posix=True)
@@ -74,7 +83,7 @@ fi
 REPO_PATH="${COMPLIANCE_REPO_PATH:-}"
 if [ -z "$REPO_PATH" ]; then
   # Look for "cd <path>" segment in the piped command
-  REPO_PATH=$(python3 -c 'import re, sys
+  REPO_PATH=$("$PY" -c 'import re, sys
 cmd = sys.argv[1]
 m = re.search(r"cd\s+([^\s&;]+)", cmd)
 print(m.group(1) if m else "")' "$COMMAND")
@@ -111,7 +120,7 @@ if [ "$AGE" -gt "$MAX_AGE" ]; then
 fi
 
 # ─── Head matches? ───────────────────────────────────────────────────────────
-EVIDENCE_HEAD=$(python3 -c "import json; d=json.load(open('$EVIDENCE')); print(d.get('head',''))")
+EVIDENCE_HEAD=$("$PY" -c "import json; d=json.load(open('$EVIDENCE')); print(d.get('head',''))")
 if [ -n "$CURRENT_HEAD" ] && [ -n "$EVIDENCE_HEAD" ]; then
   case "$CURRENT_HEAD" in
     "$EVIDENCE_HEAD"*) ;;
@@ -128,8 +137,8 @@ if [ -n "$CURRENT_HEAD" ] && [ -n "$EVIDENCE_HEAD" ]; then
 fi
 
 # ─── Findings gates ──────────────────────────────────────────────────────────
-CRITICAL=$(python3 -c "import json; d=json.load(open('$EVIDENCE')); print(d.get('critical',0))")
-HIGH=$(python3 -c "import json; d=json.load(open('$EVIDENCE')); print(d.get('high',0))")
+CRITICAL=$("$PY" -c "import json; d=json.load(open('$EVIDENCE')); print(d.get('critical',0))")
+HIGH=$("$PY" -c "import json; d=json.load(open('$EVIDENCE')); print(d.get('high',0))")
 
 if [ "$CRITICAL" -gt "$MAX_CRITICAL" ]; then
   echo "BLOCK: Evidence shows $CRITICAL Critical findings (limit $MAX_CRITICAL)." >&2
@@ -142,7 +151,7 @@ fi
 
 # ─── Optional smoke-test check ───────────────────────────────────────────────
 if [ -n "$SMOKE_EXPECTED" ]; then
-  SMOKE=$(python3 -c "import json; d=json.load(open('$EVIDENCE')); print(d.get('smoke_test',''))")
+  SMOKE=$("$PY" -c "import json; d=json.load(open('$EVIDENCE')); print(d.get('smoke_test',''))")
   if [ "$SMOKE" != "$SMOKE_EXPECTED" ]; then
     echo "BLOCK: Evidence smoke_test is '$SMOKE', expected '$SMOKE_EXPECTED'." >&2
     exit 2
@@ -151,7 +160,7 @@ fi
 
 # ─── Optional tsc check ──────────────────────────────────────────────────────
 if [ "$TSC_REQUIRED" = "1" ]; then
-  TSC=$(python3 -c "import json; d=json.load(open('$EVIDENCE')); print(d.get('tsc',''))")
+  TSC=$("$PY" -c "import json; d=json.load(open('$EVIDENCE')); print(d.get('tsc',''))")
   if [ "$TSC" != "clean" ]; then
     echo "BLOCK: Evidence tsc is '$TSC', expected 'clean'." >&2
     exit 2
