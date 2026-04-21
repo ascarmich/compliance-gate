@@ -1,0 +1,17 @@
+{
+  "_comment": "Paste this PreToolUse Bash matcher into each APEX instance's .claude/settings.json. Tune env vars inline for per-instance behavior. See install.md for details.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "COMPLIANCE_SMOKE_EXPECTED='<your-expected-smoke-string>' COMPLIANCE_TSC_REQUIRED=1 bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/compliance-gate.sh\"",
+            "statusMessage": "Checking compliance gate..."
+          }
+        ]
+      }
+    ]
+  }
+}

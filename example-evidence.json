@@ -1,0 +1,7 @@
+{
+  "head": "abc1234",
+  "critical": 0,
+  "high": 0,
+  "smoke_test": "18/18 passed",
+  "tsc": "clean"
+}
